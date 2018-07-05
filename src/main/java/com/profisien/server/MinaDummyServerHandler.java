@@ -20,12 +20,13 @@ public class MinaDummyServerHandler implements IoHandler {
 
 	@Override
 	public void inputClosed(IoSession session) throws Exception {
+		//System.out.print("[inputClosed]");
 	}
 
 	@Override
 	public void messageReceived(IoSession session, Object message) throws Exception {
 		
-		Path path = Paths.get(ClassLoader.getSystemResource("abcsout2000_correctressize.txt").toURI());
+		Path path = Paths.get(ClassLoader.getSystemResource("newas400_req.txt").toURI());
 		byte[] inputFileByte = Files.readAllBytes(path);
 		IoBuffer buffer = IoBuffer.wrap(inputFileByte);
 		
@@ -39,22 +40,27 @@ public class MinaDummyServerHandler implements IoHandler {
 
 	@Override
 	public void messageSent(IoSession session, Object message) throws Exception {
+		//System.out.print("[messageSent]");
 	}
 
 	@Override
 	public void sessionClosed(IoSession session) throws Exception {
+		//System.out.print("[sessionClosed]");
 	}
 
 	@Override
 	public void sessionCreated(IoSession session) throws Exception {
+		//System.out.print("[sessionCreated]");
 	}
 
 	@Override
 	public void sessionIdle(IoSession session, IdleStatus arg1) throws Exception {
+		//System.out.print("[sessionIdle]");
 	}
 
 	@Override
 	public void sessionOpened(IoSession arg0) throws Exception {
+		//System.out.print("[sessionOpened]");
 	}
 
 }

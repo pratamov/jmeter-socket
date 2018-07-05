@@ -9,11 +9,7 @@ import org.apache.mina.transport.socket.nio.NioSocketAcceptor;
 
 public class MinaDummyServer {
 
-	private static final int PORT = 8888;
-
-	public MinaDummyServer() {
-		
-	}
+	private static final int PORT = 9103;
 
 	public static void main(String[] args) throws IOException {
 		

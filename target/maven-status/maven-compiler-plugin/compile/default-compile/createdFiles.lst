@@ -1,2 +1,10 @@
-com\profisien\jmeter\As400SocketSamplerClient.class
+com\profisien\client\PooledSocketSamplerClient.class
+com\profisien\client\SocketConnectionDao.class
+com\profisien\client\SocketConnectionPool.class
 com\profisien\server\DummyServer.class
+com\profisien\server\MinaDummyServer.class
+com\profisien\server\MinaDummyServerHandler.class
+com\profisien\client\SocketConnectionAllocator.class
+com\profisien\jmeter\As400SocketSamplerClient.class
+com\profisien\client\SocketConnectionConfiguration.class
+com\profisien\jmeter\TestPoolSamplerClient.class

@@ -4,9 +4,13 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.PrintWriter;
 import java.io.Serializable;
+import java.io.StringWriter;
 import java.net.InetAddress;
 import java.net.Socket;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 
 import org.apache.commons.io.IOUtils;
 import org.apache.jmeter.config.Arguments;
@@ -22,8 +26,11 @@ public class As400SocketSamplerClient extends AbstractJavaSamplerClient implemen
 	@Override
 	public Arguments getDefaultParameters() {
 		Arguments defaultParameters = new Arguments();
-        defaultParameters.addArgument("HOST", "localhost");
-        defaultParameters.addArgument("PORT", "8888");
+        defaultParameters.addArgument("HOST", "10.35.65.175");
+        defaultParameters.addArgument("PORT", "9103");
+        defaultParameters.addArgument("ERROR_ON_NO_RESPONSE", "false");
+        defaultParameters.addArgument("SHOW_ERROR_ONLY", "false");
+        defaultParameters.addArgument("REQUEST_MESSAGE_FILENAME", "newas400_res.txt");
         return defaultParameters;
 	}
 	
@@ -31,6 +38,9 @@ public class As400SocketSamplerClient extends AbstractJavaSamplerClient implemen
 	public SampleResult runTest(JavaSamplerContext context) {
 		String host = context.getParameter("HOST");
 		int port = Integer.parseInt(context.getParameter("PORT"));
+		boolean errorOnNoResponse = "true".equals(context.getParameter("ERROR_ON_NO_RESPONSE"));
+		boolean showErrorOnly = "true".equals(context.getParameter("SHOW_ERROR_ONLY"));
+		String requestMessageFilename = context.getParameter("REQUEST_MESSAGE_FILENAME");
 		
 		SampleResult result = new SampleResult();
         result.sampleStart();
@@ -39,57 +49,63 @@ public class As400SocketSamplerClient extends AbstractJavaSamplerClient implemen
         DataOutputStream dout = null;
         DataInputStream din = null;
 		try {
+
+			int length = 0;
+			byte[] resbyte = null;
 			
 			socket = new Socket(InetAddress.getByName(host), port);
 			dout = new DataOutputStream(socket.getOutputStream());
 			din = new DataInputStream(socket.getInputStream());
 
-			byte[] request = doRequest();
+			byte[] request = getRequest(requestMessageFilename);
 			dout.write(request);
 			dout.flush();
-
-			int length = din.readInt();
-			String responseData = "";
 			
-			if (length > 0) {
-				byte[] resbyte = new byte[length];
-				din.read(resbyte);
-				responseData = new String(resbyte);
-			}
+			byte[] headerbyte = new byte[4];
+			din.read(headerbyte);
+            length = ByteBuffer.wrap(headerbyte).order(ByteOrder.BIG_ENDIAN).getInt();  
+            resbyte = new byte[length];
+            din.read(resbyte);
+			
+			try {
+				dout.close();
+				din.close();
+				socket.close();
+			} catch (Exception e) {}
+			
+			if (length == 0 && errorOnNoResponse)
+				throw new Exception("NO RESPONSE");
+			
+			if (showErrorOnly)
+				return null;
 			
 			result.sampleEnd();
 			result.setSuccessful(true);
-			result.setResponseData(responseData, "IBM285");
+			result.setResponseData(resbyte);
 			result.setResponseCodeOK();
-			result.setResponseMessage("OK");
+			result.setResponseMessage(length+"");
 			
 		} catch (Exception e) {
 			
+			StringWriter sw = new StringWriter();
+			PrintWriter pw = new PrintWriter(sw);
+			e.printStackTrace(pw);
+			
 			result.sampleEnd();
 			result.setSuccessful(false);
-			result.setResponseCode("500");
-			result.setResponseMessage(e.getMessage());
+			result.setResponseCode("404");
+			result.setResponseMessage(sw.toString());
 			
-		} finally {
-			try {
-				dout.close();
-			} catch (Exception e) {}
-			try {
-				din.close();
-			} catch (Exception e) {}
-			try {
-				socket.close();
-			} catch (Exception e) {}
 		}
 		return result;
 	}
 	
-	public static byte[] doRequest() {
+	public static byte[] getRequest(String filename) {
 		if (request != null && request.length > 0)
 			return request;
 		try {
 			ClassLoader classloader = Thread.currentThread().getContextClassLoader();
-			InputStream is = classloader.getResourceAsStream("abcsin2000_req.txt");
+			InputStream is = classloader.getResourceAsStream(filename);
 			request = IOUtils.toByteArray(is);
 			
 		} catch (IOException e) {}
