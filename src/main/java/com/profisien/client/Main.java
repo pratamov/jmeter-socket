@@ -2,6 +2,9 @@ package com.profisien.client;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.PrintWriter;
+import java.io.StringWriter;
+import java.util.concurrent.CountDownLatch;
 
 import org.apache.commons.io.IOUtils;
 
@@ -10,10 +13,14 @@ import stormpot.PoolException;
 public class Main implements Runnable{
 
 	private static final String HOST = "10.35.65.175";
+	//private static final String HOST = "localhost";
 	private static final int PORT = 9103;
 	private static byte[] request = null;
 	
+	private static Integer success = 0;
+	
 	private final SocketConnectionDao dao;
+	private static CountDownLatch latch;
 	
 	public Main(SocketConnectionDao dao) {
 		this.dao = dao;
@@ -21,45 +28,54 @@ public class Main implements Runnable{
 	
 	public static void main(String[] args) {
 		
-		int poolSize = 1000;
-		int threadCount = 10000;
+		int poolSize = 300;
+		int threadCount = 100;
 		
+		// initializate pool class
 		SocketConnectionConfiguration configuration = new SocketConnectionConfiguration(HOST, PORT);
 		configuration.setPoolSize(poolSize);
-		SocketConnectionPool pool = new SocketConnectionPool(configuration);
+		SocketConnectionBlazePool pool = new SocketConnectionBlazePool(configuration);
+		// --------------
 		
 		long startTime = System.nanoTime();
 		long beforeUsedMem = Runtime.getRuntime().totalMemory()-Runtime.getRuntime().freeMemory();
 		
-		long maxPoolUsage = 0;
-		
-		for (int i = 1; i <= threadCount; i++) {
+		latch = new CountDownLatch(threadCount);
+		// creating new threads
+		for (int i = 0; i < threadCount; i++) {
 			
 			try {
-				SocketConnectionDao dao = pool.clain();
+				SocketConnectionDao dao = pool.claim();
 				new Thread(new Main(dao)).start();
-				maxPoolUsage = Math.max((long)maxPoolUsage, pool.allocationCount());
 				
-			} catch (PoolException | InterruptedException e) {}
+			} catch (PoolException | InterruptedException e) {
+				System.out.println(e.getMessage());
+			}
 			
 		}
-		long endTime = System.nanoTime();
-		long afterUsedMem=Runtime.getRuntime().totalMemory()-Runtime.getRuntime().freeMemory();
-		
-		double duration = (endTime - startTime)/1000000;
-		double tps = threadCount*1000/duration;
-		
-		double memoryConsumption = (afterUsedMem - beforeUsedMem) / (1024 * 1024);
-		
-		System.out.println("----- Configuration -----");
-		System.out.println("Pool size: " + poolSize);
-		System.out.println("Thread count: " + threadCount);
-		
-		System.out.println("----- Performance -----");
-		System.out.println("Memory Consumption: " + memoryConsumption + " MB");
-		System.out.println("Maximum Pool usage: " + (100 * maxPoolUsage / poolSize) + "%");
-		System.out.println("Execution time: " + duration + " MS");
-		System.out.println("Transation per second: " + String.format("%.2f", tps) + " TPS");
+		// --------------------
+		try {
+			latch.await();
+			
+			System.out.println("----- Configuration -----");
+			System.out.println("Pool size: " + poolSize);
+			System.out.println("Thread count: " + threadCount);
+			
+			long endTime = System.nanoTime();
+			long afterUsedMem = Runtime.getRuntime().totalMemory()-Runtime.getRuntime().freeMemory();
+			double duration = (endTime - startTime)/1000000;
+			double tps = threadCount*1000/duration;
+			double memoryConsumption = (afterUsedMem - beforeUsedMem) / (1024 * 1024);
+			long poolAllocation = pool.allocationCount();
+			
+			System.out.println("----- Performance -----");
+			System.out.println("Memory Consumption: " + memoryConsumption + " MB");
+			System.out.println("Pool allocation count: " + poolAllocation);
+			System.out.println("Execution time: " + duration + " MS");
+			System.out.println("Transation per second: " + String.format("%.2f", tps) + " TPS");
+			System.out.println("Success rate: " + (success*100 / threadCount) + "%");
+			
+		} catch (InterruptedException e1) {}
 		
 		try {
 			
@@ -71,6 +87,10 @@ public class Main implements Runnable{
 
 	}
 	
+	/**
+	 * 
+	 * Generate dummy request from file
+	 */
 	private static byte[] generateRequest(String filename) {
 		
 		if (request != null && request.length > 0)
@@ -80,7 +100,8 @@ public class Main implements Runnable{
 			InputStream is = classloader.getResourceAsStream(filename);
 			request = IOUtils.toByteArray(is);
 			
-		} catch (IOException e) {}
+		} catch (IOException e) {
+		}
 		return request;
 		
 	}
@@ -88,19 +109,31 @@ public class Main implements Runnable{
 	@Override
 	public void run() {
 		
-		byte[] request = generateRequest("newas400_res.txt");
+		byte[] request = generateRequest("newas400_req.txt");
 		
 		try {
 			
-			byte[] response = dao.invoke(request);
 			// consume the response here
-			dao.close();
+			byte[] response = dao.invoke(request);
+			if (response.length > 0) {
+
+				synchronized(success) {
+					success++;
+				}
+				
+			}
 			
 		} catch (IOException e) {
-			
+			StringWriter sw = new StringWriter();
+			PrintWriter pw = new PrintWriter(sw);
+			e.printStackTrace(pw);
+			System.out.println(sw.toString());
 		} finally {
+			// make sure the socket is ready to reused by another thread
 			dao.release();
 		}
+		
+		latch.countDown();
 		
 	}
 

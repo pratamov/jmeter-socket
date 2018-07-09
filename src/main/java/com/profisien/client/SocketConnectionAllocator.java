@@ -13,7 +13,7 @@ public class SocketConnectionAllocator implements Allocator<SocketConnectionDao>
 	public SocketConnectionAllocator(SocketConnectionConfiguration configuration) {
 		this.configuration = configuration;
 	}
-	
+
 	@Override
 	public SocketConnectionDao allocate(Slot slot) throws Exception {
 		synchronized(configuration) {

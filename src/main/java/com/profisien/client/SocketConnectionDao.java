@@ -19,10 +19,11 @@ public class SocketConnectionDao implements Poolable {
 		
 		this.slot = slot;
 		this.socket = socket;
+		
 	}
 	
 	public byte[] invoke(byte[] request) throws IOException {
-
+		
 		DataOutputStream dout = new DataOutputStream(socket.getOutputStream());
 		DataInputStream din = new DataInputStream(socket.getInputStream());
 		
@@ -31,17 +32,18 @@ public class SocketConnectionDao implements Poolable {
 		
 		byte[] headerbyte = new byte[4];
 		din.read(headerbyte);
-        int length = ByteBuffer.wrap(headerbyte).order(ByteOrder.BIG_ENDIAN).getInt();  
+        int length = ByteBuffer.wrap(headerbyte).order(ByteOrder.BIG_ENDIAN).getInt();
+        
         byte[] responseBytes = new byte[length];
         din.read(responseBytes);
-
-        din.close();
+        
         dout.close();
+        din.close();
         
         return responseBytes;
 		
 	}
-
+	
 	@Override
 	public void release() {
 		
@@ -53,6 +55,10 @@ public class SocketConnectionDao implements Poolable {
 		
 		socket.close();
 		
+	}
+	
+	public boolean isClosed() {
+		return socket.isClosed();
 	}
 
 }
